@@ -115,6 +115,19 @@ var pesmiIzKosarice = function(zahteva, callback) {
   }
 }
 
+//Vrni ID stranke
+var strankaID = function(strankaId, callback){
+  pb.all("SELECT Customer.* FROM Customer, Invoice \
+          WHERE Customer.CustomerId = " + strankaId, 
+          function(napaka, vrstice) {
+              if(napaka || vrstice.length == 0){
+                callback(false);
+              }else{
+                callback(vrstice[0]);
+              }
+          })
+}
+
 streznik.get('/kosarica', function(zahteva, odgovor) {
   pesmiIzKosarice(zahteva, function(pesmi) {
     if (!pesmi)
@@ -197,11 +210,19 @@ streznik.get('/izpisiRacun/:oblika', function(zahteva, odgovor) {
       odgovor.send("<p>V košarici nimate nobene pesmi, \
         zato računa ni mogoče pripraviti!</p>");
     } else {
-      odgovor.setHeader('content-type', 'text/xml');
-      odgovor.render('eslog', {
-        vizualiziraj: zahteva.params.oblika == 'html' ? true : false,
-        postavkeRacuna: pesmi
-      })  
+      strankaID(zahteva.session.stranka, function(stranka){
+        if(zahteva.session.stranka == null || zahteva.session.stranka == undefined){
+          console.log("Ni prijavljene nobene stranke");
+          odgovor.redirect('/prijava');
+        }else{
+          odgovor.setHeader('content-type', 'text/xml');
+          odgovor.render('eslog', {
+            vizualiziraj: zahteva.params.oblika == 'html' ? true : false,
+            postavkeRacuna: pesmi,
+            kupec: stranka
+        })
+        } 
+      })
     }
   })
 })
@@ -290,6 +311,8 @@ streznik.post('/stranka', function(zahteva, odgovor) {
   form.parse(zahteva, function (napaka1, polja, datoteke) {
     zahteva.session.jePrijavljen = true;
     console.log("prijava");
+    
+    zahteva.session.stranka = polja.seznamStrank;
     odgovor.redirect('/')
   });
 })
@@ -298,6 +321,8 @@ streznik.post('/stranka', function(zahteva, odgovor) {
 streznik.post('/odjava', function(zahteva, odgovor) {
     zahteva.session.jePrijavljen = false;
     console.log("odjava");
+    
+    zahteva.session.stranka = null;
     odgovor.redirect('/prijava') 
 })
 
